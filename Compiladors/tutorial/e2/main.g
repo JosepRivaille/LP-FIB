@@ -88,16 +88,31 @@ void ASTPrint(AST *a)
   }
 }
 
+int evaluate(AST *a) {
+  if (a == NULL) return 0;
+  else if (a->kind == "intconst")
+    return atoi(a->text.c_str());
+  else if (a->kind == "+")
+    return evaluate(child(a,0)) + evaluate(child(a,1));
+}
+
 int main() {
   AST *root = NULL;
-  ANTLR(expr(&root), stdin);
+  ANTLR(input(&root), stdin);
   ASTPrint(root);
+  cout << evaluate(root) << endl;
 }
+
 >>
 
 #lexclass START
 #token NUM "[0-9]+"
 #token PLUS "\+"
+#token MINUS "\-"
+#token MULT "\*"
+#token DIV  "\/"
 #token SPACE "[\ \n]" << zzskip();>>
 
-expr: NUM (PLUS^ NUM)* ;
+input: expr "@";
+expr: term (PLUS^ term | MINUS^ term);
+term: NUM (MULT^ NUM | DIV^ NUM |)*;
