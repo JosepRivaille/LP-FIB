@@ -32,14 +32,18 @@ AST *root;
 
 // function to fill token information
 void zzcr_attr(Attrib *attr, int type, char *text) {
-  // if (type == ID) {
-  //   attr->kind = "id";
-  //   attr->text = text;
-  // }
-  // else {
+  if (type == ID) {
+     attr->kind = "id";
+     attr->text = text;
+  }
+  else if (type == NUM) {
+    attr->kind = "intconst";
+    attr->text = text;
+  }
+  else {
     attr->kind = text;
     attr->text = "";
-  // }
+  }
 }
 
 // function to create a new AST node
@@ -111,33 +115,65 @@ int main() {
 
 
 #lexclass START
-//Keywords
+// Keywords
 #token AND "AND"
 #token OR "OR"
 #token NOT "NOT"
+#token IF "if"
+#token ENDIF "endif"
+#token WHILE "while"
+#token ENDWHILE "endwhile"
 #token CONCAT ";"
-#token LT "<"
-#token LTE "<="
-#token EQ "=="
-#token GTE ">="
-#token GT ">"
-//Operators
+#token COMPARE "\< | \<= | \>= | \> | =="
+// Definitions
+#token NUM "[0-9]+"
+#token MULT "\*"
+#token DIRECTION "\/ | \- | \\"
+// Functions
+#token SHAPE "Peak | Valley"
+#token MATCH "Match"
+#token HEIGHT "Height"
+#token WELLFORMED "Wellformed"
+#token COMPLETE "Complete"
+#token DRAW "Draw"
+// Operators
 #token ASSIGN "is"
-#token VAR "[A-Z][0-9]*"
-//Definitions
-#token NUM "[1-9][0-9]*"
-#token LENGTH "\*"
-#token UP "\/"
-#token DOWN "\\"
-#token FLAT "\-"
-//WhiteSpaces
-#token SPACE "[\ \t\n]" << zzskip(); >>
+#token ID "[A-Za-z][A-Za-z0-9_]*"
+#token PLUS "\+"
+#token MINUS "\$"
+#token DIV  "\/"
+// WhiteSpaces
+#token SPACE "[\ \t\n\s]" << zzskip(); >>
 
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
-instruction: VAR ASSIGN^ mountain;
-mountain: (peak | valley);
-peak: section_up CONCAT^ section_flat CONCAT^ section_down;
-valley: section_down CONCAT^ section_flat CONCAT^ section_up;
-section_up: NUM LENGTH^ UP;
-section_down: NUM LENGTH^ DOWN;
-section_flat: NUM LENGTH^ FLAT;
+instruction: assign | condition | loop | draw | complete;
+
+assign: ID ASSIGN^ mountain;
+condition: IF^ "\("! boolexprP0 "\)"! program ENDIF!;
+loop: WHILE^ "\("! boolexprP0 "\)"! program ENDWHILE!;
+draw: DRAW^ "\("! mountain "\)"!;
+complete: COMPLETE "\("! ID "\)"!;
+
+mountain: part (CONCAT^ part)*;
+part: shape | section | idref;
+
+shape: SHAPE^ "\("! operationP0 ","! operationP0 ","! operationP0 "\)"!;
+section: NUM MULT^ DIRECTION;
+idref: "#"! ID;
+
+height: HEIGHT^ "\("! idref "\)"!;
+match: MATCH^ "\("! idref ","! idref "\)"!;
+wellformed: WELLFORMED^ "\("! ID "\)"!;
+comparation: operationP0 COMPARE^ operationP0;
+
+fun: height | match | wellformed;
+
+boolexprP0: boolexprP1 (OR^ boolexprP1)*;
+boolexprP1: boolexprP2 (AND^ boolexprP2)*;
+boolexprP2: (NOT^ |) boolexprP3;
+boolexprP3: match | wellformed | comparation;
+
+operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
+operationP1: numericvalue ((MULT^ | DIV^) numericvalue)*;
+
+numericvalue: NUM | fun | ID;
