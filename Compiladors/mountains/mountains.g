@@ -130,12 +130,7 @@ int main() {
 #token MULT "\*"
 #token DIRECTION "\/ | \- | \\"
 // Functions
-#token SHAPE "Peak | Valley"
-#token MATCH "Match"
-#token HEIGHT "Height"
-#token WELLFORMED "Wellformed"
-#token COMPLETE "Complete"
-#token DRAW "Draw"
+#token FUNCTION "[A-Z][A-Za-z0-9_]*"
 // Operators
 #token ASSIGN "is"
 #token ID "[A-Za-z][A-Za-z0-9_]*"
@@ -146,34 +141,28 @@ int main() {
 #token SPACE "[\ \t\n\s]" << zzskip(); >>
 
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
-instruction: assign | condition | loop | draw | complete;
+instruction: assign | condition | loop | fun;
 
 assign: ID ASSIGN^ mountain;
 condition: IF^ "\("! boolexprP0 "\)"! program ENDIF!;
 loop: WHILE^ "\("! boolexprP0 "\)"! program ENDWHILE!;
-draw: DRAW^ "\("! mountain "\)"!;
-complete: COMPLETE "\("! ID "\)"!;
+fun: FUNCTION^ "\("! parameters "\)"!;
 
 mountain: part (CONCAT^ part)*;
-part: shape | section | idref;
-
-shape: SHAPE^ "\("! operationP0 ","! operationP0 ","! operationP0 "\)"!;
-section: NUM MULT^ DIRECTION;
+part: fun | section | idref;
 idref: "#"! ID;
 
-height: HEIGHT^ "\("! idref "\)"!;
-match: MATCH^ "\("! idref ","! idref "\)"!;
-wellformed: WELLFORMED^ "\("! ID "\)"!;
-comparation: operationP0 COMPARE^ operationP0;
+section: NUM MULT^ DIRECTION;
 
-fun: height | match | wellformed;
+parameters: (operationP0 (","! operationP0)* |);
 
 boolexprP0: boolexprP1 (OR^ boolexprP1)*;
 boolexprP1: boolexprP2 (AND^ boolexprP2)*;
-boolexprP2: (NOT^ |) boolexprP3;
-boolexprP3: match | wellformed | comparation;
+boolexprP2: (NOT^ |) comparation;
+
+comparation: operationP0 COMPARE^ operationP0;
 
 operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
 operationP1: numericvalue ((MULT^ | DIV^) numericvalue)*;
 
-numericvalue: NUM | fun | ID;
+numericvalue: NUM | fun | ID | idref;
