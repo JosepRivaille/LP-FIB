@@ -49,9 +49,9 @@ void zzcr_attr(Attrib *attr, int type, char *text) {
 // function to create a new AST node
 AST* createASTnode(Attrib* attr, int type, char* text) {
   AST* as = new AST;
-  as->kind = attr->kind; 
+  as->kind = attr->kind;
   as->text = attr->text;
-  as->right = NULL; 
+  as->right = NULL;
   as->down = NULL;
   return as;
 }
@@ -88,7 +88,7 @@ void ASTPrintIndent(AST *a, string s) {
     ASTPrintIndent(i, s+"  |"+string(i->kind.size()+i->text.size(), ' '));
     i = i->right;
   }
-  
+
   if (i != NULL) {
     cout << s+"  \\__";
     ASTPrintIndent(i, s+"   "+string(i->kind.size()+i->text.size(), ' '));
@@ -96,7 +96,7 @@ void ASTPrintIndent(AST *a, string s) {
   }
 }
 
-/// print AST 
+/// print AST
 void ASTPrint(AST *a) {
   while (a != NULL) {
     cout << " ";
@@ -148,17 +148,17 @@ int main() {
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
 instruction: assign | condition | loop | draw | complete;
 
-assign: ID ASSIGN^ mountain;
+assign: ID ASSIGN^ (mountain | height);
 condition: IF^ "\("! boolexprP0 "\)"! program ENDIF!;
 loop: WHILE^ "\("! boolexprP0 "\)"! program ENDWHILE!;
 draw: DRAW^ "\("! mountain "\)"!;
-complete: COMPLETE "\("! ID "\)"!;
+complete: COMPLETE^ "\("! ID "\)"!;
 
 mountain: part (CONCAT^ part)*;
 part: shape | section | idref;
 
 shape: SHAPE^ "\("! operationP0 ","! operationP0 ","! operationP0 "\)"!;
-section: NUM MULT^ DIRECTION;
+section: NUM (MULT^ DIRECTION |);
 idref: "#"! ID;
 
 height: HEIGHT^ "\("! idref "\)"!;
@@ -166,7 +166,7 @@ match: MATCH^ "\("! idref ","! idref "\)"!;
 wellformed: WELLFORMED^ "\("! ID "\)"!;
 comparation: operationP0 COMPARE^ operationP0;
 
-fun: height | match | wellformed;
+numericexpr: NUM | height | ID;
 
 boolexprP0: boolexprP1 (OR^ boolexprP1)*;
 boolexprP1: boolexprP2 (AND^ boolexprP2)*;
@@ -174,6 +174,4 @@ boolexprP2: (NOT^ |) boolexprP3;
 boolexprP3: match | wellformed | comparation;
 
 operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
-operationP1: numericvalue ((MULT^ | DIV^) numericvalue)*;
-
-numericvalue: NUM | fun | ID;
+operationP1: numericexpr ((MULT^ | DIV^) numericexpr)*;
