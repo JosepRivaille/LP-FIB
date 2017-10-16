@@ -105,11 +105,19 @@ void ASTPrint(AST *a) {
   }
 }
 
+void execute_mountains(AST *a) {
+  int i = 0;
+  //while(child(a, i)) {
+    
+  //}
+}
+
 
 int main() {
   root = NULL;
   ANTLR(program(&root), stdin);
   ASTPrint(root);
+  execute_mountains(root);
 }
 >>
 
@@ -148,17 +156,17 @@ int main() {
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
 instruction: assign | condition | loop | draw | complete;
 
-assign: ID ASSIGN^ (mountain | height);
+assign: ID ASSIGN^ (mountain | height | NUM);
 condition: IF^ "\("! boolexprP0 "\)"! program ENDIF!;
 loop: WHILE^ "\("! boolexprP0 "\)"! program ENDWHILE!;
 draw: DRAW^ "\("! mountain "\)"!;
 complete: COMPLETE^ "\("! ID "\)"!;
 
-mountain: part (CONCAT^ part)*;
+mountain: (CONCAT^ part)*;
 part: shape | section | idref;
 
 shape: SHAPE^ "\("! operationP0 ","! operationP0 ","! operationP0 "\)"!;
-section: NUM (MULT^ DIRECTION |);
+section: NUM MULT^ DIRECTION;
 idref: "#"! ID;
 
 height: HEIGHT^ "\("! idref "\)"!;
