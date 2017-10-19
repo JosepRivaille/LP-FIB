@@ -108,7 +108,7 @@ void ASTPrint(AST *a) {
 void execute_mountains(AST *a) {
   int i = 0;
   //while(child(a, i)) {
-    
+
   //}
 }
 
@@ -135,7 +135,7 @@ int main() {
 #token COMPARE "\< | \<= | \>= | \> | =="
 // Definitions
 #token NUM "[0-9]+"
-#token MULT "\*"
+#token TIMES "\*"
 #token DIRECTION "\/ | \- | \\"
 // Functions
 #token SHAPE "Peak | Valley"
@@ -149,6 +149,7 @@ int main() {
 #token ID "[A-Za-z][A-Za-z0-9_]*"
 #token PLUS "\+"
 #token MINUS "\$"
+#token MULT "\·"
 #token DIV  "\/"
 // WhiteSpaces
 #token SPACE "[\ \t\n\s]" << zzskip(); >>
@@ -156,30 +157,31 @@ int main() {
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
 instruction: assign | condition | loop | draw | complete;
 
-assign: ID ASSIGN^ (mountain | height | NUM);
+assign: ID ASSIGN^ (mountain);
 condition: IF^ "\("! boolexprP0 "\)"! program ENDIF!;
 loop: WHILE^ "\("! boolexprP0 "\)"! program ENDWHILE!;
 draw: DRAW^ "\("! mountain "\)"!;
 complete: COMPLETE^ "\("! ID "\)"!;
 
-mountain: (CONCAT^ part)*;
+mountain: part (CONCAT^ part)*;
 part: shape | section | idref;
 
 shape: SHAPE^ "\("! operationP0 ","! operationP0 ","! operationP0 "\)"!;
-section: NUM MULT^ DIRECTION;
+section: operationP0 (TIMES^ DIRECTION |);
 idref: "#"! ID;
+
+operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
+operationP1: numericexpr ((MULT^ | DIV^) numericexpr)*;
 
 height: HEIGHT^ "\("! idref "\)"!;
 match: MATCH^ "\("! idref ","! idref "\)"!;
 wellformed: WELLFORMED^ "\("! ID "\)"!;
 comparation: operationP0 COMPARE^ operationP0;
 
-numericexpr: NUM | height | ID;
-
 boolexprP0: boolexprP1 (OR^ boolexprP1)*;
 boolexprP1: boolexprP2 (AND^ boolexprP2)*;
 boolexprP2: (NOT^ |) boolexprP3;
 boolexprP3: match | wellformed | comparation;
 
-operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
-operationP1: numericexpr ((MULT^ | DIV^) numericexpr)*;
+
+numericexpr: NUM | height | ID;

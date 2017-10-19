@@ -1,4 +1,0 @@
- list
-  \__is
-       \__id(M1)
-       \__intconst(1)
