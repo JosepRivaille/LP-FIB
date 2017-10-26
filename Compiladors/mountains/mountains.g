@@ -160,7 +160,7 @@ void ASTPrint(AST *a) {
     }
 }
 
-pair<int, int> calculateHeight(const MountainStruct& M) {
+pair<int, int> evalHeightExpr(const MountainStruct& M) {
     int maxH = 0, minH = 0, currentHeight = 0;
     for (unsigned int i = 0; i < M.size(); ++i) {
         if (M[i].second == '/')
@@ -171,7 +171,34 @@ pair<int, int> calculateHeight(const MountainStruct& M) {
         maxH = max(currentHeight, maxH);
         minH = min(currentHeight, minH);
     }
-    return {maxH - minH, maxH - 1};
+    return {(maxH - minH) + 1, maxH};
+}
+
+bool evalMatchExpr(AST* a) {
+    unsigned int expectedCount = 2;
+    unsigned int childCount = 0;
+
+    while (child(a, childCount) != NULL) ++childCount;
+    if (childCount != expectedCount)
+        throw InvalidNumParameters(a->kind, expectedCount, childCount);
+
+    for (unsigned int i = 0; i < expectedCount; ++i)
+        if (child(a, i)->kind != "id")
+            throw InvalidTypeException(child(a, i)->text, "ID");
+
+    AST* first = child(a, 0);
+    DEit = DE.find(first->text);
+    if (DEit == DE.end())
+        throw VariableNotDeclaredException(first->text, "mountain");
+    int firstHeight = evalHeightExpr(DEit->second).first;
+
+    AST* second = child(a, 1);
+    DEit = DE.find(second->text);
+    if (DEit == DE.end())
+        throw VariableNotDeclaredException(first->text, "mountain");
+    int secondHeight = evalHeightExpr(DEit->second).first;
+
+    return firstHeight == secondHeight;
 }
 
 MountainStruct evalAssignShape(AST* a) {
@@ -234,14 +261,77 @@ MountainStruct evalAssignExpr(AST* a, int ithChild) {
 }
 
 int evalNumericExpr(AST* a) {
+    cout << "Numeric -> " << a->kind << endl;
     return 42;
+}
+
+bool evalWellFormed(AST* a) {
+    AST *childID = child(a, 0);
+    if (childID->kind == "id") {
+        DEit = DE.find(childID->text);
+        if (DEit != DE.end()) {
+            char ultimate = DEit->second[DEit->second.size() - 1].second;
+            if (ultimate == '/') return false;
+            else if (ultimate == '-') {
+                char penultimate = DEit->second[DEit->second.size() - 2].second;
+                if (penultimate == '/') return false;
+            }
+            return true;
+        } else throw VariableNotDeclaredException(childID->text, "mountain");
+    } else throw InvalidTypeException(childID->text, "ID");
+}
+
+bool evalBooleanExpression(AST* a) {
+    string k = a->kind;
+    cout << "Expr -> " << k << endl;
+    if (k == "OR") {
+        bool first = evalBooleanExpression(child(a, 0));
+        bool second = evalBooleanExpression(child(a, 1));
+        return first or second;
+    } else if (k == "AND") {
+        bool first = evalBooleanExpression(child(a, 0));
+        bool second = evalBooleanExpression(child(a, 1));
+        return first and second;
+    } else if (k == "NOT") {
+        return !evalBooleanExpression(child(a, 0));
+    } else if (k == "==" or k == ">=" or k == ">" or "<=" or "<") {
+        int first = evalNumericExpr(child(a, 0));
+        int second = evalNumericExpr(child(a, 1));
+        if (k == ">=") return first >= second;
+        if (k == ">") return first > second;
+        if (k == "<=") return first <= second;
+        if (k == "<") return first < second;
+        return first == second;
+    } else if (k == "Match") {
+        return evalMatchExpr(a);
+    } else if (k == "Wellformed") {
+        return evalWellFormed(a);
+    } else throw InvalidTypeException(a->text, "Boolean");
+}
+
+void evalCompleteMountain(AST* a) {
+    AST *childID = child(a, 0);
+    if (childID->kind == "id") {
+        DEit = DE.find(childID->text);
+        if (DEit != DE.end()) {
+            char ultimate = DEit->second[DEit->second.size() - 1].second;
+            if (ultimate == '/') {
+                DEit->second.push_back({1, '-'});
+                DEit->second.push_back({1, '\\'});
+            } else if (ultimate == '-') {
+                char penultimate = DEit->second[DEit->second.size() - 2].second;
+                if (penultimate == '/')
+                    DEit->second.push_back({1, '\\'});
+            }
+        } else throw VariableNotDeclaredException(childID->text, "mountain");
+    } else throw InvalidTypeException(childID->text, "ID");
 }
 
 void evalDrawMountain(AST* a) {
     AST *childID = child(a, 0);
     if (childID->kind == "id") {
         DEit = DE.find(childID->text);
-        pair<int, int> p = calculateHeight(DEit->second);
+        pair<int, int> p = evalHeightExpr(DEit->second);
         int mountainHeight = p.first;
         int currentHeight = p.second;
 
@@ -251,8 +341,6 @@ void evalDrawMountain(AST* a) {
         }
 
         PrintableMatrix P(shape.size(), PrintableCol(mountainHeight, ' '));
-
-        cout << shape.size() << endl;
 
         if (DEit != DE.end()) {
             for (unsigned int i = 0; i < shape.size(); ++i) {
@@ -298,8 +386,17 @@ void executeMountains(AST* a) {
                     if (DEit != DE.end())
                         DE.erase(DEit);
                 }
+            } else if (kindChild == "Complete") {
+                evalCompleteMountain(child(a, ithChild));
             } else if (kindChild == "Draw") {
                 evalDrawMountain(child(a, ithChild));
+            } else if (kindChild == "if") {
+                bool eval = evalBooleanExpression(child(child(a, ithChild), 0));
+                if (eval)
+                    executeMountains(child(child(a, ithChild), 1));
+            } else if (kindChild == "while") {
+                while (evalBooleanExpression(child(child(a, ithChild), 0)))
+                    executeMountains(child(child(a, ithChild), 1));
             }
         } catch(exception &e) {
             cerr << e.what() << endl;
