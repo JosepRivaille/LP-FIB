@@ -1,5 +1,6 @@
 ones :: [Integer]
-ones = iterate (+0) 1
+ones = 1:ones
+-- ones = iterate (+0) 1
 
 nats :: [Integer]
 nats = iterate (+1) 0
@@ -14,40 +15,45 @@ factorials :: [Integer]
 factorials = scanl (*) 1 (iterate (+1) 1)
 
 fibs :: [Integer]
-fibs = [0, 1] ++ fibs' 1 0
+fibs = [0, 1] ++ zipWith (+) fibs (tail fibs)
+-- fibs = [0, 1] ++ fibs' 1 0
 
-fibs' :: Integer -> Integer -> [Integer]
-fibs' n1 n2 = [n] ++ fibs' n n1
-    where n = n1 + n2
+-- fibs' :: Integer -> Integer -> [Integer]
+-- fibs' n1 n2 = [n] ++ fibs' n n1
+--     where n = n1 + n2
 
 primes :: [Integer]
-primes = primes' [] 2
+primes = sieve (iterate (+1) 2)
+--primes = primes' [] 2
 
-primes' :: [Integer] -> Integer -> [Integer]
-primes' l n
-    | isPrime l n   = [n] ++ primes' (l ++ [n]) (n+1)
-    | otherwise     = primes' l (n+1)
+sieve :: [Integer] -> [Integer]
+sieve (e:l) = [e] ++ sieve (filter (\x -> mod x e /= 0) l)
 
-isPrime :: [Integer] -> Integer -> Bool
-isPrime l n = and . map (\x -> mod n x > 0) $ takeWhile (\x -> x*x <= n) l
+-- primes' :: [Integer] -> Integer -> [Integer]
+-- primes' l n
+--     | isPrime l n   = [n] ++ primes' (l ++ [n]) (n+1)
+--     | otherwise     = primes' l (n+1)
 
--- hammings :: [Integer]
--- hammings = [1] ++ insertList h5 (insertList h3 h2)
---     where
---         h2 = map (\x -> 2^x) positives
---         h3 = map (\x -> 3^x) positives
---         h5 = map (\x -> 5^x) positives
---         positives = iterate (+1) 1
---
--- insertList :: [Integer] -> [Integer] -> [Integer]
--- insertList l [] = l
--- insertList [] l = l
--- insertList il@(ie:ilt) ol@(oe:olt)
---     | ie > oe   = [oe] ++ insertList il olt
---     | ie < oe   = [ie] ++ insertList ilt ol
---     | otherwise = [oe] ++ insertList ilt olt
+-- isPrime :: [Integer] -> Integer -> Bool
+-- isPrime l n = and . map (\x -> mod n x > 0) $ takeWhile (\x -> x*x <= n) l
 
--- lookNsay :: [Integer]
+hammings :: [Integer]
+hammings = [1] ++ (map (*2) hammings) `merge` (map (*3) hammings) `merge` (map (*5) hammings)
+
+merge :: [Integer] -> [Integer] -> [Integer]
+merge l1@(el1:tl1) l2@(el2:tl2)
+    | el1 < el2 = [el1] ++ merge tl1 l2
+    | el1 > el2 = [el2] ++ merge l1 tl2
+    | otherwise = [el1] ++ merge tl1 tl2
+
+lookNsay :: [Integer]
+lookNsay = [1] ++ iterate (\x -> read $ lookNsay' (show x) 1) 11
+
+lookNsay' :: String -> Integer -> String
+lookNsay' [e] count = show count ++ [e]
+lookNsay' (e1:ts@(e2:s)) count
+    | e1 == e2  = lookNsay' ts (count+1)
+    | otherwise = show count ++ [e1] ++ lookNsay' ts 1
 
 tartaglia :: [[Integer]]
 tartaglia = iterate (\x -> zipWith (+) (0:x) x ++ [1]) [1]

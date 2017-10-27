@@ -1,5 +1,1 @@
-M1 is Peak(1,1,3);4*/
-Complete(M1)
-if (Match(#M1, #M2) OR Height(#M1) == 3 AND NOT Wellformed(M1))
-    Draw(#M1)
-endif
+k is 1 + 2
