@@ -172,7 +172,7 @@ pair<int, int> evalHeightExpr(const MountainStruct& M) {
         maxH = max(currentHeight, maxH);
         minH = min(currentHeight, minH);
     }
-    return {(maxH - minH) + 1, maxH};
+    return {maxH - minH, maxH};
 }
 
 bool evalMatchExpr(AST* a) {
@@ -354,7 +354,7 @@ void drawMountain(const MountainStruct& M) {
         shape += string(M[i].first, M[i].second);
     }
 
-    PrintableMatrix P(shape.size(), PrintableCol(mountainHeight, ' '));
+    PrintableMatrix P(shape.size(), PrintableCol(mountainHeight + 1, ' '));
 
     for (unsigned int i = 0; i < shape.size(); ++i) {
         P[i][currentHeight] = shape[i];
