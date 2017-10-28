@@ -466,8 +466,10 @@ void printFinalHeights() {
 int main(int argc, char** argv) {
     root = NULL;
     ANTLR(program(&root), stdin);
-    if (argc == 2 and argv[1] == "-t")
+    if (argc == 2) {
         ASTPrint(root);
+        cout << endl << "----------------------------------------" << endl;
+    }
     executeMountains(root);
     printFinalHeights();
 }
@@ -523,7 +525,8 @@ section: operationP0 (TIMES^ DIRECTION |);
 idref: "#"! ID;
 
 operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
-operationP1: numericexpr ((MULT^ | DIV^) numericexpr)*;
+operationP1: operationP2 ((MULT^ | DIV^) operationP2)*;
+operationP2: ("\("! operationP0 "\)"! | numericexpr);
 
 height: HEIGHT^ "\("! idref "\)"!;
 match: MATCH^ "\("! idref ","! idref "\)"!;
