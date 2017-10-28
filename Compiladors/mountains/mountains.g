@@ -29,6 +29,7 @@ AST* createASTnode(Attrib* attr, int ttype, char *textt);
 #include <vector>
 #include <string>
 #include <exception>
+#include <unistd.h>
 
 class MountainCompilerException : public exception {
 protected:
@@ -201,6 +202,33 @@ bool evalMatchExpr(AST* a) {
     return firstHeight == secondHeight;
 }
 
+int evalNumericExpr(AST* a) {
+    string k = a->kind;
+    if (k == "+" or k == "-" or k == "·" or k == "/") {
+        int leftNumber = evalNumericExpr(child(a, 0));
+        int rightNumber = evalNumericExpr(child(a, 1));
+        if (k == "+") return leftNumber + rightNumber;
+        if (k == "-") return leftNumber - rightNumber;
+        if (k == "·") return leftNumber * rightNumber;
+        if (k == "/") return leftNumber / rightNumber;
+    } else if (k == "Height") {
+        AST* id = child(a, 0);
+        if (id->kind != "id")
+            throw InvalidTypeException(id->text, "ID");
+        DEit = DE.find(id->text);
+        if (DEit != DE.end())
+            return evalHeightExpr(DEit->second).first;
+        else throw VariableNotDeclaredException(id->text, "mountain");
+    } else if (k == "intconst") {
+        return stoi(a->text);
+    } else if (k == "id") {
+        NEit = NE.find(a->text);
+        if (NEit != NE.end())
+            return NEit->second;
+    }
+    throw InvalidTypeException(a->text, "mountain or numeric expression");
+}
+
 MountainStruct evalAssignShape(AST* a) {
     unsigned int expectedCount = 3;
     unsigned int childCount = 0;
@@ -209,14 +237,10 @@ MountainStruct evalAssignShape(AST* a) {
     if (childCount != expectedCount)
         throw InvalidNumParameters(a->kind, expectedCount, childCount);
 
-    for (unsigned int i = 0; i < expectedCount; ++i)
-        if (child(a, i)->kind != "intconst")
-            throw InvalidTypeException(child(a, i)->text, "number");
-
     MountainStruct M(3);
-    M[0] = {stoi(child(a, 0)->text), a->kind == "Peak" ? '/' : '\\'};
-    M[1] = {stoi(child(a, 1)->text), '-'};
-    M[2] = {stoi(child(a, 2)->text), a->kind == "Peak" ? '\\' : '/'};
+    M[0] = {evalNumericExpr(child(a, 0)), a->kind == "Peak" ? '/' : '\\'};
+    M[1] = {evalNumericExpr(child(a, 1)), '-'};
+    M[2] = {evalNumericExpr(child(a, 2)), a->kind == "Peak" ? '\\' : '/'};
     return M;
 }
 
@@ -259,35 +283,6 @@ MountainStruct evalAssignExpr(AST* a, int ithChild) {
         } else return M;
     }
     return M;
-}
-
-int evalNumericExpr(AST* a) {
-    string k = a->kind;
-    if (k == "+" or k == "-" or k == "·" or k == "/") {
-        int leftNumber = evalNumericExpr(child(a, 0));
-        int rightNumber = evalNumericExpr(child(a, 1));
-        switch (k[0]) {
-            case '+':
-                return leftNumber + rightNumber;
-            case '-':
-                return leftNumber - rightNumber;
-                //TODO: Multiply
-            // case '·':
-            //    return leftNumber * rightNumber;
-            case '/':
-                return leftNumber / rightNumber;
-        }
-    } else if (k == "Height") {
-        AST* id = child(a, 0);
-        if (id->kind != "id")
-            throw InvalidTypeException(id->text, "ID");
-        DEit = DE.find(id->text);
-        if (DEit != DE.end())
-            return evalHeightExpr(DEit->second).first;
-        else throw VariableNotDeclaredException(id->text, "mountain");
-    } else if (k == "intconst") {
-        return stoi(a->text);
-    } else throw InvalidTypeException(a->text, "mountain or numeric expression");
 }
 
 bool evalWellFormed(AST* a) {
@@ -396,43 +391,45 @@ void evalDrawMountain(AST* a) {
 void executeMountains(AST* a) {
     int ithChild = 0;
     while(child(a, ithChild)) {
-        AST* assignExpr = child(a, ithChild);
-        string kindChild = assignExpr->kind;
+        AST* ithExpr = child(a, ithChild);
+        string kindChild = ithExpr->kind;
         try {
             if (kindChild == "is") {
-                AST* exprId = child(assignExpr, 0);
+                AST* exprId = child(ithExpr, 0);
                 if (exprId->kind != "id")
                     throw InvalidTypeException(exprId->text, "ID");
 
-                MountainStruct M = evalAssignExpr(assignExpr, 1);
+                MountainStruct M = evalAssignExpr(ithExpr, 1);
                 if (M.size()) {
-                    DE.insert({exprId->text, M});
+                    DEit = DE.find(exprId->text);
+                    if (DEit == DE.end()) DE.insert({exprId->text, M});
+                    else DEit->second = M;
+
                     NEit = NE.find(exprId->text);
                     if (NEit != NE.end())
                         NE.erase(NEit);
                 } else {
-                    NE.insert({exprId->text, evalNumericExpr(child(assignExpr, 1))});
+                    int numericValue = evalNumericExpr(child(ithExpr, 1));
+                    NEit = NE.find(exprId->text);
+                    if (NEit == NE.end()) NE.insert({exprId->text, numericValue});
+                    else NEit->second = numericValue;
+
                     DEit = DE.find(exprId->text);
                     if (DEit != DE.end())
                         DE.erase(DEit);
                 }
             } else if (kindChild == "Complete") {
-                evalCompleteMountain(assignExpr);
+                evalCompleteMountain(ithExpr);
             } else if (kindChild == "Draw") {
-                evalDrawMountain(assignExpr);
+                evalDrawMountain(ithExpr);
             } else if (kindChild == "if") {
-                if (evalBooleanExpression(child(assignExpr, 0)))
-                    executeMountains(child(assignExpr, 1));
+                if (evalBooleanExpression(child(ithExpr, 0)))
+                    executeMountains(child(ithExpr, 1));
             } else if (kindChild == "while") {
-                while (evalBooleanExpression(child(assignExpr, 0)))
-                    executeMountains(child(assignExpr, 1));
-            }
+                while (evalBooleanExpression(child(ithExpr, 0)))
+                    executeMountains(child(ithExpr, 1));
+            } else throw InvalidTypeException(kindChild, "instruction");
         } catch(exception &e) {
-            cout << "Mountains: {" << endl;
-            for (DEit = DE.begin(); DEit != DE.end(); ++DEit) {
-                cout << "  " << DEit->first << ": " << DEit->second.size() << endl;
-            } cout << "}" << endl;
-
             cerr << e.what() << endl;
             exit(1);
         }
@@ -452,7 +449,7 @@ void printFinalHeights() {
 int main(int argc, char** argv) {
     root = NULL;
     ANTLR(program(&root), stdin);
-    //if (argc == 2 and argv[1] == "-t")
+    if (argc == 2 and argv[1] == "-t")
         ASTPrint(root);
     executeMountains(root);
     printFinalHeights();
