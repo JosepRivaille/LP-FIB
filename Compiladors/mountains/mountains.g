@@ -393,14 +393,6 @@ void evalDrawMountain(AST* a) {
     }
 }
 
-void printFinalHeights() {
-    for (DEit = DE.begin(); DEit != DE.end(); ++DEit) {
-        int height = evalHeightExpr(DEit->second).first;
-        cout << endl << "l'altitut final de " << DEit->first << " és: " << height << endl;
-        drawMountain(DEit->second);
-    }
-}
-
 void executeMountains(AST* a) {
     int ithChild = 0;
     while(child(a, ithChild)) {
@@ -446,16 +438,24 @@ void executeMountains(AST* a) {
         }
         ++ithChild;
     }
-    printFinalHeights();
 }
 
+void printFinalHeights() {
+    cout << endl << "----------------------------------------" << endl;
+    for (DEit = DE.begin(); DEit != DE.end(); ++DEit) {
+        int height = evalHeightExpr(DEit->second).first;
+        cout << endl << "l'altitut final de " << DEit->first << " és: " << height << endl;
+        drawMountain(DEit->second);
+    }
+}
 
 int main(int argc, char** argv) {
     root = NULL;
     ANTLR(program(&root), stdin);
-    if (argc == 2 and argv[1] == "-t")
+    //if (argc == 2 and argv[1] == "-t")
         ASTPrint(root);
     executeMountains(root);
+    printFinalHeights();
 }
 >>
 
