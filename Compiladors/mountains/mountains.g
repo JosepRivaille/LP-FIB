@@ -406,50 +406,45 @@ void executeMountains(AST* a) {
     while(child(a, ithChild)) {
         AST* ithExpr = child(a, ithChild);
         string kindChild = ithExpr->kind;
-        try {
-            if (kindChild == "is") {
-                AST* exprId = child(ithExpr, 0);
-                if (exprId->kind != "id")
-                    throw InvalidTypeException(exprId->text, "ID");
+        if (kindChild == "is") {
+            AST* exprId = child(ithExpr, 0);
+            if (exprId->kind != "id")
+                throw InvalidTypeException(exprId->text, "ID");
 
-                MountainShape MS = evalAssignExpr(ithExpr, 1);
-                if (MS.size()) {
-                    pair<int, int> preHeight = evalHeightExpr(MS);
-                    bool preWellFormed = isWellFormed(MS);
-                    MountainStruct M = {MS, preHeight, preWellFormed};
+            MountainShape MS = evalAssignExpr(ithExpr, 1);
+            if (MS.size()) {
+                pair<int, int> preHeight = evalHeightExpr(MS);
+                bool preWellFormed = isWellFormed(MS);
+                MountainStruct M = {MS, preHeight, preWellFormed};
 
-                    DEit = DE.find(exprId->text);
-                    if (DEit == DE.end()) DE.insert({exprId->text, M});
-                    else DEit->second = M;
+                DEit = DE.find(exprId->text);
+                if (DEit == DE.end()) DE.insert({exprId->text, M});
+                else DEit->second = M;
 
-                    NEit = NE.find(exprId->text);
-                    if (NEit != NE.end())
-                        NE.erase(NEit);
-                } else {
-                    int numericValue = evalNumericExpr(child(ithExpr, 1));
-                    NEit = NE.find(exprId->text);
-                    if (NEit == NE.end()) NE.insert({exprId->text, numericValue});
-                    else NEit->second = numericValue;
+                NEit = NE.find(exprId->text);
+                if (NEit != NE.end())
+                    NE.erase(NEit);
+            } else {
+                int numericValue = evalNumericExpr(child(ithExpr, 1));
+                NEit = NE.find(exprId->text);
+                if (NEit == NE.end()) NE.insert({exprId->text, numericValue});
+                else NEit->second = numericValue;
 
-                    DEit = DE.find(exprId->text);
-                    if (DEit != DE.end())
-                        DE.erase(DEit);
-                }
-            } else if (kindChild == "Complete") {
-                evalCompleteMountain(ithExpr);
-            } else if (kindChild == "Draw") {
-                evalDrawMountain(ithExpr);
-            } else if (kindChild == "if") {
-                if (evalBooleanExpression(child(ithExpr, 0)))
-                    executeMountains(child(ithExpr, 1));
-            } else if (kindChild == "while") {
-                while (evalBooleanExpression(child(ithExpr, 0)))
-                    executeMountains(child(ithExpr, 1));
-            } else throw InvalidTypeException(kindChild, "instruction");
-        } catch(exception &e) {
-            cerr << e.what() << endl;
-            exit(1);
-        }
+                DEit = DE.find(exprId->text);
+                if (DEit != DE.end())
+                    DE.erase(DEit);
+            }
+        } else if (kindChild == "Complete") {
+            evalCompleteMountain(ithExpr);
+        } else if (kindChild == "Draw") {
+            evalDrawMountain(ithExpr);
+        } else if (kindChild == "if") {
+            if (evalBooleanExpression(child(ithExpr, 0)))
+                executeMountains(child(ithExpr, 1));
+        } else if (kindChild == "while") {
+            while (evalBooleanExpression(child(ithExpr, 0)))
+                executeMountains(child(ithExpr, 1));
+        } else throw InvalidTypeException(kindChild, "instruction");
         ++ithChild;
     }
 }
@@ -470,8 +465,13 @@ int main(int argc, char** argv) {
         ASTPrint(root);
         cout << endl << "----------------------------------------" << endl;
     }
-    executeMountains(root);
-    printFinalHeights();
+    try {
+        executeMountains(root);
+        printFinalHeights();
+    } catch(exception &e) {
+        cerr << e.what() << endl;
+        exit(1);
+    }
 }
 >>
 
