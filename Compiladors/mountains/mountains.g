@@ -541,11 +541,14 @@ int main(int argc, char** argv) {
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
 instruction: assign | condition | loop | draw | complete;
 
-assign: ID ASSIGN^ mountain;
+assign: ID ASSIGN^ (numStart | mountainStart);
 condition: IF^ LPAR! boolexprP0 RPAR! program ENDIF!;
 loop: WHILE^ LPAR! boolexprP0 RPAR! program ENDWHILE!;
 draw: DRAW^ LPAR! mountain RPAR!;
 complete: COMPLETE^ LPAR! ID RPAR!;
+
+numStart: operationP0 (TIMES^ DIRECTION (CONCAT^ mountain |) |);
+mountainStart: (shape | idref) (CONCAT^ mountain |);
 
 mountain: part (CONCAT^ part)*;
 part: shape | section | idref;
