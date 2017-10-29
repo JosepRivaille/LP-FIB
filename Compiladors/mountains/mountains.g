@@ -65,7 +65,7 @@ public:
 
 class ImpossibleActionException : public MountainCompilerException {
 public:
-    ImpossibleActionException(const string& varName, const string& action, const string& why) {
+    ImpossibleActionException(const string& action, const string& varName, const string& why) {
         errorMsg += "Can not " + action + " mountain " + varName + " because " + why + ".";
     }
 };
@@ -295,23 +295,19 @@ MountainShape evalAssignExpr(AST* a, int ithChild) {
 }
 
 bool isWellFormed(MountainShape& M) {
-    for (unsigned int i = 0; i < M.size(); ++i) {
-        if (i % 3 == 0) {
-            if (M[i].second != '/')
-                return false;
-        } else if (i % 3 == 1) {
-            if (M[i].second != '-')
-                return false;
-        } else {
-            if (M[i].second != '\\')
-                return false;
-        }
+    char current = M[0].second;
+    for (unsigned int i = 1; i < M.size(); ++i) {
+        if (current == '/')
+            if (M[i].second == '\\') return false;
+        current = M[i].second;
     }
+
     char ultimate = M[M.size() - 1].second;
-    if (ultimate == '/') return false;
-    else if (ultimate == '-') {
-        char penultimate = M[M.size() - 2].second;
-        if (penultimate == '/') return false;
+    if (ultimate == '-') return false;
+    if (ultimate == '/' and M.size() < 2) return false;
+    if (ultimate == '\\') {
+        if (M.size() < 2 or M[M.size() - 2].second != '-') return false;
+        if (M.size() < 3 or M[M.size() - 3].second != '/') return false;
     }
     return true;
 }
@@ -320,8 +316,9 @@ bool evalWellFormed(AST* a) {
     AST *childID = child(a, 0);
     if (childID->kind == "id") {
         DEit = DE.find(childID->text);
-        if (DEit != DE.end())
-            isWellFormed(DEit->second.mountainShape);
+        if (DEit != DE.end()) {
+            return DEit->second.wellformed;
+        }
         else throw VariableNotDeclaredException(childID->text, "mountain");
     } else throw InvalidTypeException(childID->text, "ID");
 }
@@ -356,20 +353,21 @@ void evalCompleteMountain(AST* a) {
     if (childID->kind == "id") {
         DEit = DE.find(childID->text);
         if (DEit != DE.end()) {
-            char ultimate = DEit->second.mountainShape
-                [DEit->second.mountainShape.size() - 1].second;
-            if (ultimate == '/') {
-                DEit->second.mountainShape.push_back({1, '-'});
-                DEit->second.mountainShape.push_back({1, '\\'});
-            } else if (ultimate == '-') {
-                char penultimate = DEit->second.mountainShape
-                    [DEit->second.mountainShape.size() - 2].second;
-                if (penultimate == '/')
+            if (not DEit->second.wellformed) {
+                char ultimate = DEit->second.mountainShape[DEit->second.mountainShape.size() - 1].second;
+                if (ultimate == '/') {
+                    DEit->second.mountainShape.push_back({1, '-'});
                     DEit->second.mountainShape.push_back({1, '\\'});
+                } else if (ultimate == '-') {
+                    char penultimate = DEit->second.mountainShape
+                        [DEit->second.mountainShape.size() - 2].second;
+                    if (penultimate == '/')
+                        DEit->second.mountainShape.push_back({1, '\\'});
+                }
+                DEit->second.wellformed = isWellFormed(DEit->second.mountainShape);
+                if (not DEit->second.wellformed)
+                    throw ImpossibleActionException("Complete", childID->text, "invalid formation can't be fixed");
             }
-            DEit->second.wellformed = isWellFormed(DEit->second.mountainShape);
-            if (not DEit->second.wellformed)
-                throw ImpossibleActionException("Complete", childID->text, "invalid formation can't be fixed");
         } else throw VariableNotDeclaredException(childID->text, "mountain");
     } else throw InvalidTypeException(childID->text, "ID");
 }
