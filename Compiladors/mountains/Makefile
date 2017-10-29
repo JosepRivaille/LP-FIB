@@ -1,5 +1,5 @@
 RM = rm -f
-OBJS = *.exe *.o *.c *.h *.dlg
+OBJS = *.exe *.o *.c *.h *.dlg out*
 
 mountains:
 	antlr -gt mountains.g

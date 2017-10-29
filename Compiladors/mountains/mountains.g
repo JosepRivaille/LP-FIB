@@ -59,9 +59,15 @@ public:
 class VariableNotDeclaredException : public MountainCompilerException {
 public:
     VariableNotDeclaredException(const string& varName, const string& expectedType) {
-            errorMsg += "Variable " + varName + " is not declared or is not a valid "
-                + expectedType + ".";
+        errorMsg += "Variable " + varName + " is not declared or is not a valid " + expectedType + ".";
         }
+};
+
+class ImpossibleActionException : public MountainCompilerException {
+public:
+    ImpossibleActionException(const string& varName, const string& action, const string& why) {
+        errorMsg += "Can not " + action + " mountain " + varName + " because " + why + ".";
+    }
 };
 
 // Interpretation structures
@@ -252,14 +258,13 @@ MountainShape evalAssignPart(AST* a) {
     AST* lengthChild = child(a, 0);
     AST* directionChild = child(a, 1);
 
-    if (lengthChild->kind != "intconst")
-        throw InvalidTypeException(lengthChild->text, "number");
+    int length = evalNumericExpr(lengthChild);
     string direction = directionChild->kind;
     if (direction != "/" and direction != "-" and direction != "\\")
         throw InvalidTypeException(directionChild->kind, "direction");
 
     MountainShape M(1);
-    M[0] = {stoi(lengthChild->text), direction[0]};
+    M[0] = {length, direction[0]};
     return M;
 }
 
@@ -290,6 +295,18 @@ MountainShape evalAssignExpr(AST* a, int ithChild) {
 }
 
 bool isWellFormed(MountainShape& M) {
+    for (unsigned int i = 0; i < M.size(); ++i) {
+        if (i % 3 == 0) {
+            if (M[i].second != '/')
+                return false;
+        } else if (i % 3 == 1) {
+            if (M[i].second != '-')
+                return false;
+        } else {
+            if (M[i].second != '\\')
+                return false;
+        }
+    }
     char ultimate = M[M.size() - 1].second;
     if (ultimate == '/') return false;
     else if (ultimate == '-') {
@@ -350,6 +367,9 @@ void evalCompleteMountain(AST* a) {
                 if (penultimate == '/')
                     DEit->second.mountainShape.push_back({1, '\\'});
             }
+            DEit->second.wellformed = isWellFormed(DEit->second.mountainShape);
+            if (not DEit->second.wellformed)
+                throw ImpossibleActionException("Complete", childID->text, "invalid formation can't be fixed");
         } else throw VariableNotDeclaredException(childID->text, "mountain");
     } else throw InvalidTypeException(childID->text, "ID");
 }
@@ -389,13 +409,18 @@ void evalDrawMountain(AST* a) {
     AST *childID = child(a, 0);
     if (childID->kind == "id") {
         DEit = DE.find(childID->text);
-        if (DEit != DE.end())
+        if (DEit != DE.end()) {
+            if (not DEit->second.wellformed)
+                throw ImpossibleActionException("Draw", childID->text, "it isn't wellformed");
             drawMountain(DEit->second);
+        }
         else throw VariableNotDeclaredException(childID->text, "mountain");
     } else {
         MountainShape MS = evalAssignExpr(a, 0);
-        pair<int, int> height = evalHeightExpr(MS);
         bool wellformed = isWellFormed(MS);
+        if (not wellformed)
+            throw ImpossibleActionException("Draw", childID->text, "it isn't wellformed");
+        pair<int, int> height = evalHeightExpr(MS);
         MountainStruct M = {MS, height, wellformed};
         drawMountain(M);
     }
@@ -403,58 +428,62 @@ void evalDrawMountain(AST* a) {
 
 void executeMountains(AST* a) {
     int ithChild = 0;
-    while(child(a, ithChild)) {
-        AST* ithExpr = child(a, ithChild);
+    while(AST* ithExpr = child(a, ithChild++)) {
         string kindChild = ithExpr->kind;
-        if (kindChild == "is") {
-            AST* exprId = child(ithExpr, 0);
-            if (exprId->kind != "id")
-                throw InvalidTypeException(exprId->text, "ID");
+        try {
+            if (kindChild == "is") {
+                AST* exprId = child(ithExpr, 0);
+                if (exprId->kind != "id")
+                    throw InvalidTypeException(exprId->text, "ID");
 
-            MountainShape MS = evalAssignExpr(ithExpr, 1);
-            if (MS.size()) {
-                pair<int, int> preHeight = evalHeightExpr(MS);
-                bool preWellFormed = isWellFormed(MS);
-                MountainStruct M = {MS, preHeight, preWellFormed};
+                MountainShape MS = evalAssignExpr(ithExpr, 1);
+                if (MS.size()) {
+                    pair<int, int> preHeight = evalHeightExpr(MS);
+                    bool preWellFormed = isWellFormed(MS);
+                    MountainStruct M = {MS, preHeight, preWellFormed};
 
-                DEit = DE.find(exprId->text);
-                if (DEit == DE.end()) DE.insert({exprId->text, M});
-                else DEit->second = M;
+                    DEit = DE.find(exprId->text);
+                    if (DEit == DE.end()) DE.insert({exprId->text, M});
+                    else DEit->second = M;
 
-                NEit = NE.find(exprId->text);
-                if (NEit != NE.end())
-                    NE.erase(NEit);
-            } else {
-                int numericValue = evalNumericExpr(child(ithExpr, 1));
-                NEit = NE.find(exprId->text);
-                if (NEit == NE.end()) NE.insert({exprId->text, numericValue});
-                else NEit->second = numericValue;
+                    NEit = NE.find(exprId->text);
+                    if (NEit != NE.end())
+                        NE.erase(NEit);
+                } else {
+                    int numericValue = evalNumericExpr(child(ithExpr, 1));
+                    NEit = NE.find(exprId->text);
+                    if (NEit == NE.end()) NE.insert({exprId->text, numericValue});
+                    else NEit->second = numericValue;
 
-                DEit = DE.find(exprId->text);
-                if (DEit != DE.end())
-                    DE.erase(DEit);
-            }
-        } else if (kindChild == "Complete") {
-            evalCompleteMountain(ithExpr);
-        } else if (kindChild == "Draw") {
-            evalDrawMountain(ithExpr);
-        } else if (kindChild == "if") {
-            if (evalBooleanExpression(child(ithExpr, 0)))
-                executeMountains(child(ithExpr, 1));
-        } else if (kindChild == "while") {
-            while (evalBooleanExpression(child(ithExpr, 0)))
-                executeMountains(child(ithExpr, 1));
-        } else throw InvalidTypeException(kindChild, "instruction");
-        ++ithChild;
+                    DEit = DE.find(exprId->text);
+                    if (DEit != DE.end())
+                        DE.erase(DEit);
+                }
+            } else if (kindChild == "Complete") {
+                evalCompleteMountain(ithExpr);
+            } else if (kindChild == "Draw") {
+                evalDrawMountain(ithExpr);
+            } else if (kindChild == "if") {
+                if (evalBooleanExpression(child(ithExpr, 0)))
+                    executeMountains(child(ithExpr, 1));
+            } else if (kindChild == "while") {
+                while (evalBooleanExpression(child(ithExpr, 0)))
+                    executeMountains(child(ithExpr, 1));
+            } else throw InvalidTypeException(kindChild, "instruction");
+        } catch(exception &e) {
+            cerr << e.what() << endl;
+        }
     }
 }
 
 void printFinalHeights() {
     cout << endl << "----------------------------------------" << endl;
     for (DEit = DE.begin(); DEit != DE.end(); ++DEit) {
-        int height = DEit->second.height.first;
-        cout << endl << "l'altitut final de " << DEit->first << " és: " << height << endl;
-        drawMountain(DEit->second);
+        if (DEit->second.wellformed) {
+            int height = DEit->second.height.first;
+            cout << endl << "l'altitut final de " << DEit->first << " és: " << height << endl;
+            drawMountain(DEit->second);
+        }
     }
 }
 
@@ -465,13 +494,8 @@ int main(int argc, char** argv) {
         ASTPrint(root);
         cout << endl << "----------------------------------------" << endl;
     }
-    try {
-        executeMountains(root);
-        printFinalHeights();
-    } catch(exception &e) {
-        cerr << e.what() << endl;
-        exit(1);
-    }
+    executeMountains(root);
+    printFinalHeights();
 }
 >>
 
@@ -500,37 +524,43 @@ int main(int argc, char** argv) {
 #token DRAW "Draw"
 // Operators
 #token ASSIGN "is"
-#token ID "[A-Za-z][A-Za-z0-9_]*"
 #token PLUS "\+"
-#token MINUS "\$"
+#token MINUS "\_"
 #token MULT "\·"
 #token DIV  "\/"
+// Separators
+#token LPAR "\("
+#token RPAR "\)"
+#token COMMA ","
+#token HASH "#"
+// Variables
+#token ID "[A-Za-z][A-Za-z0-9]*"
 // WhiteSpaces
 #token SPACE "[\ \t\n\s]" << zzskip(); >>
 
 program: (instruction)* << #0 = createASTlist(_sibling); >>;
 instruction: assign | condition | loop | draw | complete;
 
-assign: ID ASSIGN^ (mountain);
-condition: IF^ "\("! boolexprP0 "\)"! program ENDIF!;
-loop: WHILE^ "\("! boolexprP0 "\)"! program ENDWHILE!;
-draw: DRAW^ "\("! mountain "\)"!;
-complete: COMPLETE^ "\("! ID "\)"!;
+assign: ID ASSIGN^ mountain;
+condition: IF^ LPAR! boolexprP0 RPAR! program ENDIF!;
+loop: WHILE^ LPAR! boolexprP0 RPAR! program ENDWHILE!;
+draw: DRAW^ LPAR! mountain RPAR!;
+complete: COMPLETE^ LPAR! ID RPAR!;
 
 mountain: part (CONCAT^ part)*;
 part: shape | section | idref;
 
-shape: SHAPE^ "\("! operationP0 ","! operationP0 ","! operationP0 "\)"!;
+shape: SHAPE^ LPAR! operationP0 COMMA! operationP0 COMMA! operationP0 RPAR!;
 section: operationP0 (TIMES^ DIRECTION |);
-idref: "#"! ID;
+idref: HASH! ID;
 
 operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
 operationP1: operationP2 ((MULT^ | DIV^) operationP2)*;
-operationP2: ("\("! operationP0 "\)"! | numericexpr);
+operationP2: (LPAR! operationP0 RPAR! | numericexpr);
 
-height: HEIGHT^ "\("! idref "\)"!;
-match: MATCH^ "\("! idref ","! idref "\)"!;
-wellformed: WELLFORMED^ "\("! ID "\)"!;
+height: HEIGHT^ LPAR! idref RPAR!;
+match: MATCH^ LPAR! idref COMMA! idref RPAR!;
+wellformed: WELLFORMED^ LPAR! ID RPAR!;
 comparation: operationP0 COMPARE^ operationP0;
 
 boolexprP0: boolexprP1 (OR^ boolexprP1)*;
