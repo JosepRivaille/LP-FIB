@@ -271,25 +271,26 @@ MountainShape evalAssignPart(AST* a) {
 MountainShape evalAssignExpr(AST* a, int ithChild) {
     MountainShape M;
     while (child(a, ithChild)) {
+        MountainShape SM;
         AST* childExpr = child(a, ithChild++);
         string kindChild = childExpr->kind;
-        if (kindChild == ";") {
-            MountainShape SM = evalAssignExpr(childExpr, 0);
-            M.insert(M.end(), SM.begin(), SM.end());
-        } else if (kindChild == "Peak" or kindChild == "Valley") {
-            MountainShape SM = evalAssignShape(childExpr);
-            M.insert(M.end(), SM.begin(), SM.end());
-        } else if (kindChild == "*") {
-            MountainShape SM = evalAssignPart(childExpr);
-            M.insert(M.end(), SM.begin(), SM.end());
-        } else if (kindChild == "id") {
+        if (kindChild == ";")
+            SM = evalAssignExpr(childExpr, 0);
+        else if (kindChild == "Peak" or kindChild == "Valley")
+            SM = evalAssignShape(childExpr);
+        else if (kindChild == "*")
+            SM = evalAssignPart(childExpr);
+        else if (kindChild == "id") {
             DEit = DE.find(childExpr->text);
-            if (DEit != DE.end()) {
-                MountainShape SM = DEit->second.mountainShape;
-                M.insert(M.end(), SM.begin(), SM.end());
-            }
+            if (DEit != DE.end()) SM = DEit->second.mountainShape;
             else throw VariableNotDeclaredException(childExpr->text, "mountain");
         } else return M;
+
+        if (M.size() > 0 and SM.size() > 0 and M[M.size() - 1].second == SM[0].second) {
+            M[M.size() - 1].first += SM[0].first;
+            MountainShape::iterator it = SM.begin(); ++it;
+            M.insert(M.end(), it, SM.end());
+        } else M.insert(M.end(), SM.begin(), SM.end());
     }
     return M;
 }
@@ -356,13 +357,20 @@ void evalCompleteMountain(AST* a) {
             if (not DEit->second.wellformed) {
                 char ultimate = DEit->second.mountainShape[DEit->second.mountainShape.size() - 1].second;
                 if (ultimate == '/') {
-                    DEit->second.mountainShape.push_back({1, '-'});
-                    DEit->second.mountainShape.push_back({1, '\\'});
-                } else if (ultimate == '-') {
-                    char penultimate = DEit->second.mountainShape
-                        [DEit->second.mountainShape.size() - 2].second;
-                    if (penultimate == '/')
+                    if (DEit->second.mountainShape.size() < 2) {
+                        DEit->second.mountainShape.push_back({1, '-'});
                         DEit->second.mountainShape.push_back({1, '\\'});
+                    } else {
+                        char penultimate = DEit->second.mountainShape
+                        [DEit->second.mountainShape.size() - 2].second;
+                        if (penultimate == '\\') {
+                            DEit->second.mountainShape.push_back({1, '-'});
+                            DEit->second.mountainShape.push_back({1, '\\'});
+                        }
+                    }
+                } else if (ultimate == '-') {
+                    char penultimate = DEit->second.mountainShape[DEit->second.mountainShape.size() - 2].second;
+                    DEit->second.mountainShape.push_back({1, (penultimate == '/') ? '\\' : '/'});
                 }
                 DEit->second.wellformed = isWellFormed(DEit->second.mountainShape);
                 if (not DEit->second.wellformed)
