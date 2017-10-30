@@ -520,7 +520,8 @@ int main(int argc, char** argv) {
 // Definitions
 #token NUM "[0-9]+"
 #token TIMES "\*"
-#token DIRECTION "\/ | \- | \\"
+#token DIRECTIONUP "\/"
+#token DIRECTIONDOWN "\\"
 // Functions
 #token SHAPE "Peak | Valley"
 #token MATCH "Match"
@@ -531,7 +532,7 @@ int main(int argc, char** argv) {
 // Operators
 #token ASSIGN "is"
 #token PLUS "\+"
-#token MINUS "\_"
+#token MINUS "\-"
 #token MULT "\·"
 #token DIV  "\/"
 // Separators
@@ -553,14 +554,14 @@ loop: WHILE^ LPAR! boolexprP0 RPAR! program ENDWHILE!;
 draw: DRAW^ LPAR! mountain RPAR!;
 complete: COMPLETE^ LPAR! ID RPAR!;
 
-numStart: operationP0 (TIMES^ DIRECTION (CONCAT^ mountain |) |);
+numStart: operationP0 (TIMES^ direction (CONCAT^ mountain |) |);
 mountainStart: (shape | idref) (CONCAT^ mountain |);
 
 mountain: part (CONCAT^ part)*;
 part: shape | section | idref;
 
 shape: SHAPE^ LPAR! operationP0 COMMA! operationP0 COMMA! operationP0 RPAR!;
-section: operationP0 (TIMES^ DIRECTION |);
+section: operationP0 TIMES^ direction;
 idref: HASH! ID;
 
 operationP0: operationP1 ((PLUS^ | MINUS^) operationP1)*;
@@ -578,3 +579,4 @@ boolexprP2: (NOT^ |) boolexprP3;
 boolexprP3: match | wellformed | comparation;
 
 numericexpr: NUM | height | ID;
+direction: DIRECTIONUP | MINUS | DIRECTIONDOWN;

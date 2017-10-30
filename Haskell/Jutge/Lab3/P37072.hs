@@ -41,6 +41,8 @@ breadthFirst (Node x l r) = [x] ++ breadthFirst' l r
 
 breadthFirst' :: Tree a -> Tree a -> [a]
 breadthFirst' Empty Empty = []
+breadthFirst' (Node x l r) Empty = [x] ++ breadthFirst' l r
+breadthFirst' Empty (Node x l r) = [x] ++ breadthFirst' l r
 breadthFirst' (Node x1 l1 r1) (Node x2 l2 r2) = [x1, x2] ++ first ++ second
     where
         first = breadthFirst' l1 r1
