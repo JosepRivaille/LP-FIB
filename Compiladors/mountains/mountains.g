@@ -496,10 +496,10 @@ void printFinalHeights() {
 int main(int argc, char** argv) {
     root = NULL;
     ANTLR(program(&root), stdin);
-    if (argc == 2) {
-        ASTPrint(root);
-        cout << endl << "----------------------------------------" << endl;
-    }
+    if (argc == 2 and !strcmp(argv[1], "-t")) {
+            ASTPrint(root);
+            cout << endl << "----------------------------------------" << endl;
+        }
     executeMountains(root);
     printFinalHeights();
 }
@@ -545,12 +545,13 @@ int main(int argc, char** argv) {
 // WhiteSpaces
 #token SPACE "[\ \t\n\s]" << zzskip(); >>
 
-program: (instruction)* << #0 = createASTlist(_sibling); >>;
+program: instructionList "@"!;
+instructionList: (instruction)* << #0 = createASTlist(_sibling); >>;
 instruction: assign | condition | loop | draw | complete;
 
 assign: ID ASSIGN^ (numStart | mountainStart);
-condition: IF^ LPAR! boolexprP0 RPAR! program ENDIF!;
-loop: WHILE^ LPAR! boolexprP0 RPAR! program ENDWHILE!;
+condition: IF^ LPAR! boolexprP0 RPAR! instructionList ENDIF!;
+loop: WHILE^ LPAR! boolexprP0 RPAR! instructionList ENDWHILE!;
 draw: DRAW^ LPAR! mountain RPAR!;
 complete: COMPLETE^ LPAR! ID RPAR!;
 
