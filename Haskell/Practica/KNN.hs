@@ -37,13 +37,13 @@ calcDistsClass :: Flower -> (Flower -> Flower -> Float) -> [Flower] -> [(String,
 calcDistsClass f df = map (\x -> (clas x, df f x))
 
 -- Reduced list with sum of same-class scoress and number of appearances
-countAppearances :: [(String, Float)] -> ((String, Float), Int) -> [((String, Float), Int)]
-countAppearances [(e, ed)] current@((clas, clasd), count)
-    | e == clas = [((clas, clasd + ed), count + 1)]
-    | otherwise = [current, ((e, ed), 1)]
-countAppearances ((e, ed):l) current@((clas, clasd), count)
-    | e == clas = countAppearances l ((clas, clasd + ed), count + 1)
-    | otherwise = [current] ++ countAppearances l ((e, ed), 1)
+countAppearances :: [String] -> (String, Int) -> [(String, Int)]
+countAppearances [e] current@(clas, count)
+    | e == clas = [(clas, count + 1)]
+    | otherwise = [current, (e, 1)]
+countAppearances (e:l) current@(clas, count)
+    | e == clas = countAppearances l (clas, count + 1)
+    | otherwise = [current] ++ countAppearances l (e, 1)
 
 -- Reduced list with sum of same-class scores
 sumWeights :: [(String, Float)] -> (String, Float) -> [(String, Float)]
@@ -55,15 +55,9 @@ sumWeights ((c, w):l) current@(clas, weight)
     | otherwise = [current] ++ sumWeights l (c, w)
 
 -- Class corresponding to max appearing class
-maxAppearances :: [(String, Float)] -> String
-maxAppearances l = fst $ fst $ head $ sortBy countDist (countAppearances sl (head sl, 0))
-    where
-        sl = sortBy (\(k1, _) (k2, _) -> compare k1 k2) l
-        countDist :: ((String, Float), Int) -> ((String, Float), Int) -> Ordering
-        countDist ((_, d1), c1) ((_, d2), c2)
-            | c1 < c2   = GT
-            | c2 < c1   = LT
-            | otherwise = compare d1 d2
+maxAppearances :: [String] -> String
+maxAppearances l = fst $ head $ sortBy (flip $ comparing snd) (countAppearances sl (head sl, 0))
+    where sl = sort l
 
 -- Class corresponding to greater weighted score
 maxWeights :: [(String, Float)] -> String
@@ -72,7 +66,7 @@ maxWeights l = fst $ head $ sortBy (flip $ comparing snd) (sumWeights sl (head s
 
 -- Simple vote for kth greater scores
 simpleVote :: Int -> [(String, Float)] -> String
-simpleVote k dc = maxAppearances $ vote
+simpleVote k dc = maxAppearances $ map fst $ vote
     where vote = take k $ sortBy (comparing snd) dc
 
 -- Weighted vote for kth greater scores
@@ -121,7 +115,7 @@ main = do
     testFile <- readFile "./iris.test.txt"
     let testset = readFlowers $ lines testFile
     -- Predictions
-    let vt = map (\f -> kNN trainset f 3 euclideanDistance simpleVote) testset
+    let vt = map (\f -> kNN trainset f 3 euclideanDistance weightedVote) testset
     -- Results
     let acc = accuracy vt testset
     let los = lost vt testset
