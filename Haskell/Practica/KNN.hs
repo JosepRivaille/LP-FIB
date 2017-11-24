@@ -1,10 +1,5 @@
 import System.IO
-
 import Numeric
-
-import Data.List.Split
-import Data.List
-import Data.Ord
 
 data Flower = Flower {
     clas :: String,
@@ -13,6 +8,37 @@ data Flower = Flower {
     petL :: Float,
     petW :: Float
 } deriving (Show)
+
+data ClassCount = ClassCount {
+    cclas :: String,
+    count :: Int
+} deriving (Show)
+
+data ClassWeight = ClassWeight {
+    wclas :: String,
+    weight :: Float
+} deriving (Show)
+
+-- ***** HELPERS *****
+
+splitOn :: Ord a => a -> [a] -> [[a]]
+splitOn _ [] = []
+splitOn sep s = [takeWhile (/= sep) s] ++ splitOn sep trs
+    where
+        trs = if null rs then [] else tail rs
+        rs = dropWhile (/= sep) s
+
+sortBy :: (a -> a -> Ordering) -> [a] -> [a]
+sortBy _ [] = []
+sortBy cmp (x:l) = (sortBy cmp left) ++ [x] ++ (sortBy cmp right)
+    where
+        left = [e | e <- l, cmp e x /= GT]
+        right = [e | e <- l, cmp e x == GT]
+
+comparing :: (Ord a) => (b -> a) -> b -> b -> Ordering
+comparing f x y = compare (f x) (f y)
+
+-- ***** DISTANCES *****
 
 -- Euclidean distance given two flowers
 euclideanDistance :: Flower -> Flower -> Float
@@ -36,33 +62,35 @@ manhattanDistance f1 f2 = adSepL + adSepW + adPetL + adPetW
 calcDistsClass :: Flower -> (Flower -> Flower -> Float) -> [Flower] -> [(String, Float)]
 calcDistsClass f df = map (\x -> (clas x, df f x))
 
--- Reduced list with sum of same-class scoress and number of appearances
-countAppearances :: [String] -> (String, Int) -> [(String, Int)]
-countAppearances [e] current@(clas, count)
-    | e == clas = [(clas, count + 1)]
-    | otherwise = [current, (e, 1)]
-countAppearances (e:l) current@(clas, count)
-    | e == clas = countAppearances l (clas, count + 1)
-    | otherwise = [current] ++ countAppearances l (e, 1)
+-- ***** VOTATION *****
 
--- Reduced list with sum of same-class scores
-sumWeights :: [(String, Float)] -> (String, Float) -> [(String, Float)]
-sumWeights [(c, w)] current@(clas, weight)
-    | c == clas = [(clas, weight + w)]
-    | otherwise = [current, (c, w)]
-sumWeights ((c, w):l) current@(clas, weight)
-    | c == clas = sumWeights l (clas, weight + w)
-    | otherwise = [current] ++ sumWeights l (c, w)
+-- Reduced list with sum of same-class scoress and number of appearances given ordered list
+countAppearances :: [ClassCount] -> [ClassCount]
+countAppearances [] = []
+countAppearances [e] = [e]
+countAppearances (e1:e2:l)
+    | cclas e1 == cclas e2  = [e'] ++ countAppearances (e':l)
+    | otherwise             = [e1] ++ countAppearances (e2:l)
+        where e' = (ClassCount (cclas e2) (count e2 + count e1))
+
+-- Reduced list with sum of same-class scores given ordered list
+sumWeights :: [ClassWeight] -> [ClassWeight]
+sumWeights [] = []
+sumWeights [e] = [e]
+sumWeights (e1:e2:l)
+    | wclas e1 == wclas e2  = [e'] ++ sumWeights (e':l)
+    | otherwise             = [e1] ++ sumWeights (e2:l)
+        where e' = (ClassWeight (wclas e2) (weight e2 + weight e1))
 
 -- Class corresponding to max appearing class
 maxAppearances :: [String] -> String
-maxAppearances l = fst $ head $ sortBy (flip $ comparing snd) (countAppearances sl (head sl, 0))
-    where sl = sort l
+maxAppearances l = cclas $ head $ sortBy (flip $ comparing count) appearances
+    where appearances = countAppearances $ map (\c -> (ClassCount c 1)) $ sortBy compare l
 
 -- Class corresponding to greater weighted score
-maxWeights :: [(String, Float)] -> String
-maxWeights l = fst $ head $ sortBy (flip $ comparing snd) (sumWeights sl (head sl))
-    where sl = sortBy (comparing fst) l
+maxWeights :: [ClassWeight] -> String
+maxWeights l = wclas $ head $ sortBy (flip $ comparing weight) weights
+    where weights = sumWeights $ sortBy (comparing wclas) l
 
 -- Simple vote for kth greater scores
 simpleVote :: Int -> [(String, Float)] -> String
@@ -72,7 +100,9 @@ simpleVote k dc = maxAppearances $ map fst $ vote
 -- Weighted vote for kth greater scores
 weightedVote :: Int -> [(String, Float)] -> String
 weightedVote k dc = maxWeights $ vote
-    where vote = take k $ sortBy (flip $ comparing snd) (map (\(c, d) -> (c, 1/d)) dc)
+    where vote = take k $ sortBy (flip $ comparing weight) $ map (\(c, d) -> (ClassWeight c (1/d))) dc
+
+-- ***** EVALUATION *****
 
 -- Accuracy percent
 accuracy :: [String] -> [Flower] -> Float
@@ -105,8 +135,9 @@ readFlowers (f:l) = [castFlower f] ++ readFlowers l
 -- String data to Flower Structure
 castFlower :: String -> Flower
 castFlower f = Flower (s!!4) (read $ s!!0) (read $ s!!1) (read $ s!!2) (read $ s!!3)
-    where s = splitOn "," f
+    where s = splitOn ',' f
 
+main :: IO ()
 main = do
     -- Train dataset
     trainFile <- readFile "./iris.train.txt"
@@ -114,15 +145,46 @@ main = do
     -- Test dataset
     testFile <- readFile "./iris.test.txt"
     let testset = readFlowers $ lines testFile
+    -- Distance functions
+    let dfs = [euclideanDistance, manhattanDistance]
+    -- Vote functions
+    let vfs = [simpleVote, weightedVote]
+    -- Evaluate functions
+    let efs = [[accuracy], [lost], [accuracy, lost]]
+
+    putStrLn "Choose k parameter:"
+    k <- getLine
+
+    putStrLn "Choose distance function:"
+    putStrLn "1. Euclidean distance."
+    putStrLn "2. Manhattan distance."
+    dfq <- getLine
+
+    putStrLn "Choose vote function:"
+    putStrLn "1. Simple vote."
+    putStrLn "2. Weighted vote."
+    vfq <- getLine
+
     -- Predictions
-    let vt = map (\f -> kNN trainset f 3 euclideanDistance weightedVote) testset
-    -- Results
-    let acc = accuracy vt testset
-    let los = lost vt testset
-    let res = ["*****",
-               "Accuracy: " ++ (showFFloat (Just 2) acc ""),
-               "Lost: " ++ (showFFloat (Just 2) los ""),
-               "*****"]
+    let df = dfs !! (read dfq - 1)
+    let vf = vfs !! (read vfq - 1)
+    let vt = map (\f -> kNN trainset f (read k) df vf) testset
 
     mapM_ putStrLn vt
-    mapM_ putStrLn res
+    putStrLn "**********"
+
+    putStrLn "Choose evaluation function:"
+    putStrLn "1. Accuracy"
+    putStrLn "2. Lost"
+    putStrLn "3. Both"
+    efq <- getLine
+
+    let ef = efs !! (read efq - 1)
+    let res = evalKNN vt testset ef
+    mapM_ putStrLn $ map (\x -> showFFloat (Just 2) x "") res
+
+    putStrLn "\nRepeat with new functions? (Y/N)"
+    newExp <- getLine
+    putStrLn "**********"
+
+    if newExp == "Y" then main else putStrLn "Program finished."
