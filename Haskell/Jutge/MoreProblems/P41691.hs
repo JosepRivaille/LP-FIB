@@ -1,2 +1,4 @@
+import Data.List
+
 mult :: [Double] -> [Double] -> [[Double]]
-mult p1 p2 = map (\c -> map (*c) p2) p1
+mult p1 p2 = transpose [p1, p2]

@@ -27,7 +27,7 @@ countDivisors l@(p:px) = (countDivisors rp) * ((length lp)+1)
 analyze :: Int -> Either Int Bool
 analyze 1 = Right False
 analyze n
-  | cd<=12 = Left cd -- (isPseudoperfect n a005835_list)
+  | cd<=12 = Left cd 
   | otherwise = Left cd
   where
       cd = (countDivisors fl)-1
