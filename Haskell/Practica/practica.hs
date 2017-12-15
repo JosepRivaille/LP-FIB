@@ -1,4 +1,3 @@
-import System.IO
 import Numeric
 
 data Flower = Flower String [Float] deriving (Show)
@@ -25,6 +24,7 @@ type EvaluationFun = [String] -> Dataset -> Float
 
 -- ***** HELPERS *****
 
+-- Splits a sequence by an element
 splitOn :: Ord a => a -> [a] -> [[a]]
 splitOn _ [] = []
 splitOn sep s = [takeWhile (/= sep) s] ++ splitOn sep trs
@@ -32,6 +32,7 @@ splitOn sep s = [takeWhile (/= sep) s] ++ splitOn sep trs
         trs = if null rs then [] else tail rs
         rs = dropWhile (/= sep) s
 
+-- Sorts a list by a comparing criteria
 sortBy :: (a -> a -> Ordering) -> [a] -> [a]
 sortBy _ [] = []
 sortBy cmp (x:l) = (sortBy cmp left) ++ [x] ++ (sortBy cmp right)
@@ -39,6 +40,7 @@ sortBy cmp (x:l) = (sortBy cmp left) ++ [x] ++ (sortBy cmp right)
         left = [e | e <- l, cmp e x /= GT]
         right = [e | e <- l, cmp e x == GT]
 
+-- Gives a comparing criteria for generic types
 comparing :: (Ord a) => (b -> a) -> b -> b -> Ordering
 comparing f x y = compare (f x) (f y)
 
@@ -46,11 +48,11 @@ comparing f x y = compare (f x) (f y)
 
 -- Euclidean distance given two flowers
 euclideanDistance :: DistanceFun
-euclideanDistance (Flower _ s1) (Flower _ s2) = sqrt . sum . map (**2) $ zipWith (-) s1 s2
+euclideanDistance (Flower _ s1) (Flower _ s2) = sqrt.sum.map (**2) $ zipWith (-) s1 s2
 
 -- Manhattan distance given two flowers
 manhattanDistance :: DistanceFun
-manhattanDistance (Flower _ s1) (Flower _ s2) = sum . map abs $ zipWith (-) s1 s2
+manhattanDistance (Flower _ s1) (Flower _ s2) = sum.map abs $ zipWith (-) s1 s2
 
 -- Evaluates a distance function given a flower and a list of flowers
 calcDistsClass :: Flower -> DistanceFun -> Dataset -> [ClassDistance]
@@ -124,14 +126,53 @@ evalKNN p ds = map (\f -> f p ds)
 
 -- Full dataset to list of flowers
 readFlowers :: [String] -> Dataset
-readFlowers [] = (Dataset [])
-readFlowers (f:l) = (Dataset ([castFlower f] ++ flowers))
-    where (Dataset flowers) = readFlowers l
+readFlowers l = Dataset $ map castFlower l
 
 -- String data to Flower Structure
 castFlower :: String -> Flower
 castFlower f = Flower (s!!4) [(read $ s!!0), (read $ s!!1), (read $ s!!2), (read $ s!!3)]
     where s = splitOn ',' f
+
+-- ***** Input / Output *****
+
+-- Asks user and returns k
+askK :: IO String
+askK = do
+    putStrLn "\nChoose k parameter:"
+    getLine
+
+-- Asks user and returns 1 (Euclidean distance) or 2 (Manhattan distance)
+askDistanceFun :: IO String
+askDistanceFun = do
+    putStrLn "\nChoose distance function:"
+    putStrLn "1. Euclidean distance."
+    putStrLn "2. Manhattan distance."
+    df <- getLine
+    if df == "1" || df == "2"
+    then return df
+    else askDistanceFun
+
+-- Asks user and returns 1 (Simple vote) or 2 (Weighted vote)
+askVoteFun :: IO String
+askVoteFun = do
+    putStrLn "\nChoose vote function:"
+    putStrLn "1. Simple vote."
+    putStrLn "2. Weighted vote."
+    vf <- getLine
+    if vf == "1" || vf == "2"
+    then return vf
+    else askVoteFun
+
+-- Asks user to restart KNN
+askToRestart :: IO ()
+askToRestart = do
+    putStrLn "\nRepeat with new functions?"
+    newExp <- getLine
+    if elem newExp ["Yes", "YES", "yes", "Y", "y"]
+    then main
+    else putStrLn "Program finished."
+
+-- ***** MAIN *****
 
 main :: IO ()
 main = do
@@ -141,46 +182,26 @@ main = do
     -- Test dataset
     testFile <- readFile "./iris.test.txt"
     let testset@(Dataset testsetlist) = readFlowers $ lines testFile
-    -- Distance functions
-    let dfs = [euclideanDistance, manhattanDistance]
-    -- Vote functions
-    let vfs = [simpleVote, weightedVote]
-    -- Evaluate functions
-    let efs = [[accuracy], [lost], [accuracy, lost]]
 
-    putStrLn "Choose k parameter:"
-    k <- getLine
-
-    putStrLn "Choose distance function:"
-    putStrLn "1. Euclidean distance."
-    putStrLn "2. Manhattan distance."
-    dfq <- getLine
-
-    putStrLn "Choose vote function:"
-    putStrLn "1. Simple vote."
-    putStrLn "2. Weighted vote."
-    vfq <- getLine
+    -- Ask for parameters k, distance function and vote function
+    k <- askK
+    dfq <- askDistanceFun
+    let df = [euclideanDistance, manhattanDistance] !! (read dfq - 1)
+    vfq <- askVoteFun
+    let vf = [simpleVote, weightedVote] !! (read vfq - 1)
 
     -- Predictions
-    let df = dfs !! (read dfq - 1)
-    let vf = vfs !! (read vfq - 1)
-    let vt = map (\f -> kNN trainset f (read k) df vf) testsetlist
+    let originals = map (\(Flower c _) -> c) testsetlist
+    let predictions = map (\f -> kNN trainset f (read k) df vf) testsetlist
+    let zippingPred o p = (init o) ++ "\t->\t" ++ (init p) ++ "\t->\t" ++ if o == p then "O" else "X"
+    putStrLn "\nTestset -> Prediction -> Matching (O) | Non-matching (X)"
+    putStrLn "*********************************************************"
+    mapM_ putStrLn $ zipWith zippingPred originals predictions
 
-    mapM_ putStrLn vt
-    putStrLn "**********"
+    -- Evaluate functions
+    let res = evalKNN predictions testset [accuracy, lost]
+    let mappingEval (t, x) = t ++ ": " ++ (showFFloat (Just 2) x "")
+    mapM_ putStrLn $ map mappingEval $ zip ["\nAccuracy", "Lost"] res
 
-    putStrLn "Choose evaluation function:"
-    putStrLn "1. Accuracy"
-    putStrLn "2. Lost"
-    putStrLn "3. Both"
-    efq <- getLine
-
-    let ef = efs !! (read efq - 1)
-    let res = evalKNN vt testset ef
-    mapM_ putStrLn $ map (\x -> showFFloat (Just 2) x "") res
-
-    putStrLn "\nRepeat with new functions? (Y/N)"
-    newExp <- getLine
-    putStrLn "**********"
-
-    if newExp == "Y" then main else putStrLn "Program finished."
+    -- Reset program if necessary
+    askToRestart

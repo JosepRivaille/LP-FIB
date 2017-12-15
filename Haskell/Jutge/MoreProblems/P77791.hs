@@ -6,5 +6,4 @@ collatzMesLlarga :: Integer -> Integer
 collatzMesLlarga n = maximum $ map (toInteger . length . serieCollatz) [1..n]
 
 representantsCollatz :: [Integer] -> [Integer]
-
-classeCollatz :: Integer -> Either Int [Integer]
+representantsCollatz = map (toInteger . length . serieCollatz)
